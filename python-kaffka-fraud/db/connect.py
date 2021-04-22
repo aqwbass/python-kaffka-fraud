@@ -174,6 +174,7 @@ def queryState(json_object):
         # ตรงนี้ต้องไป รับค่ามา
         card_no = str(json_object["card_no"])
         date = str(json_object["date"])
+        time = str(json_object['time'])
 
         # ----sql script-----
 
@@ -184,13 +185,13 @@ def queryState(json_object):
         sql2 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from generates group by card_no , trans  , date  having date::date > %s::date - interval '1 day' and card_no like %s"
 
         # freq transaction ทั้งหมด และ sum amount ไม่แยกตู้ atm ย้อนหลัง 2 ชั่วโมง
-        sql3 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from generates group by card_no , trans  , date  having date::date > %s::date - interval '2 hour' and card_no like %s"
+        sql3 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '2 hour' and card_no like %s) a group by date"
 
         # freq transaction ทั้งหมด และ sum amount ไม่แยกตู้ atm ย้อนหลัง 1 ชั่วโมง
-        sql4 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from generates group by card_no , trans  , date  having date::date > %s::date - interval '1 hour' and card_no like %s"
+        sql4 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '1 hour' and card_no like %s) a group by date"
 
         # freq transaction ทั้งหมด และ sum amount ไม่แยกตู้ atm ย้อนหลัง 5 นาที
-        sql5 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from generates group by card_no , trans  , date  having date::date > %s::date - interval '5 minutes' and card_no like %s"
+        sql5 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '5 minutes' and card_no like %s) a group by date"
 
         # std lat lon ใน 1 วัน
         sql6 = "select lat, lon from generates where date::date > %s::date - interval '1 day' and card_no like %s"
@@ -201,30 +202,35 @@ def queryState(json_object):
             with conn.cursor() as curs:
                 curs.execute(sql1, (card_no,))
                 display = curs.fetchone()
+                # print(1, display)
                 freq_sum_avg.append(to_json(display))
 
         with conn:
             with conn.cursor() as curs:
                 curs.execute(sql2, (date, card_no,))
                 display = curs.fetchone()
+                # print(2, display)
                 freq_sum_avg.append(to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql3, (date, card_no,))
+                curs.execute(sql3, (time, card_no,))
                 display = curs.fetchone()
+                # print(3, display)
                 freq_sum_avg.append(to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql4, (date, card_no,))
+                curs.execute(sql4, (time, card_no,))
                 display = curs.fetchone()
+                # print(4, display)
                 freq_sum_avg.append(to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql5, (date, card_no,))
+                curs.execute(sql5, (time, card_no,))
                 display = curs.fetchone()
+                # print(5, display)
                 freq_sum_avg.append(to_json(display))
 
         # display the PostgreSQL database
