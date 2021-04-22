@@ -127,3 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.DS_Store
+./python-kaffka-fraud/db/database.ini
+
+.idea/
