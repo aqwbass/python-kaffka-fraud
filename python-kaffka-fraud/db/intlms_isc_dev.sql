@@ -1,6 +1,5 @@
 CREATE TABLE IF NOT EXISTS public.generates (
-    date text,
-    "time" text,
+    date_time timestamp,
     card_no text,
     lat numeric,
     lon numeric,
@@ -24,9 +23,8 @@ ALTER TABLE public.generates OWNER TO bass;
 CREATE TABLE IF NOT EXISTS public.pre_items (
     amt_1 text,
     card_no text,
-    date text,
+    date_time timestamp,
     fraud text,
-    "time" text,
     freq_5_minitues integer,
     sumary_5_minitues bigint,
     average_5_minitues numeric,

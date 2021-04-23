@@ -11,7 +11,7 @@ app = Flask(__name__)
 def pre_items():
     # รับ input เป็น json format
     json_object = request.json
-
+    # print(json_object)
     # query ข้อมูล ย้อนหลัง return เป็น array มีค่าข้างในเป็น json มีทั้งหมด 5 ตำแหน่ง ใน array
     # ใน json มี date , card_no , previous_avg
     previous_list = queryPrevious(json_object)
@@ -23,12 +23,14 @@ def pre_items():
     # query transaction return เป็น array มีค่าข้างในเป็น json มีทั้งหมด 5 ตำแหน่ง ใน array
     # ใน json มี freq , sumary , average
     query_list = queryState(json_object)
+    # print(query_list)
 
     pre_items = preprocress_model(json_object, previous_list, query_list)
+    # print(pre_items)
 
     insertPreItems(pre_items)
 
-    return jsonify(json.loads(pre_items))
+    return jsonify("success")
 
 
 if __name__ == '__main__':
@@ -39,4 +41,4 @@ if __name__ == '__main__':
     # DB.commit()
     # DB.close()
 
-    app.run(host='0.0.0.0', debug=True)
+    app.run(host='0.0.0.0', debug=True, threaded=True)

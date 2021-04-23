@@ -7,16 +7,12 @@ from datetime import datetime
 def diff_amt(amt, avg):
     diff = amt - avg
     if diff < 0:
-        return 0
-    if avg == 0:
-        return 0
+        return abs(diff)
     return diff
 
 
 # คำนวน ระยะห่างพิกัด
 def haversine(lon1, lat1, lon2, lat2):
-    if lon1 == 0:
-        return 0
     lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
     dlon = lon2 - lon1
     dlat = lat2 - lat1
@@ -59,9 +55,8 @@ def preprocress_model(json_obj, previous, now):
         {
             "amt_1": json_obj["amt_1"],
             "card_no": json_obj["card_no"],
-            "date": json_obj["date"],
+            "date_time": json_obj["date"] + " " + json_obj["time"],
             "fraud": json_obj["fraud"],
-            "time": json_obj["time"],
             "freq_5_minitues": now_5_minit["freq"],
             "sumary_5_minitues": now_5_minit["sumary"],
             "average_5_minitues": now_5_minit["average"],
@@ -82,8 +77,8 @@ def preprocress_model(json_obj, previous, now):
             "sumary_total": now_total["sumary"],
             "average_total": now_total["average"],
             "diff_total": diff_amt(json_obj["amt_1"], previous_total["previous_avg"]),
-            "diff_lat_lon": haversine(json_obj["lon"], json_obj["lat"], lat_lon["lon"],
-                                      lat_lon["lat"]),
+            "diff_lat_lon": haversine(lat_lon["lon"], lat_lon["lat"], json_obj["lon"],
+                                      json_obj["lat"]),
             "is_night": in_between(json_obj["time"])
         }
     )

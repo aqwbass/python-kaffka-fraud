@@ -1,7 +1,7 @@
 import json
 
 import psycopg2
-
+import traceback
 from .config import config
 from .common.tools import previous_avg_to_json, to_json, lat_lon_to_json
 
@@ -37,10 +37,10 @@ def insertGenerates(json_object):
         # create a cursor
         cur = conn.cursor()
 
-        postgres_insert_query = """INSERT INTO generates ("date", "time", card_no, lat, lon, amt_1, fr_acct, to_acct, atm_id, trans, resp, fraud) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"""
+        postgres_insert_query = """INSERT INTO generates (date_time, card_no, lat, lon, amt_1, fr_acct, to_acct, atm_id, trans, resp, fraud) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);"""
 
         record_to_insert = (
-            json_object["date"], json_object["time"], str(json_object["card_no"]), json_object["lat"],
+            json_object["date"] + " " + json_object['time'], str(json_object["card_no"]), json_object["lat"],
             json_object["lon"],
             json_object["amt_1"], str(json_object["fr_acct"]), str(json_object["to_acct"]), json_object["atm_id"],
             json_object["trans"], json_object["resp"], str(json_object["fraud"]))
@@ -76,28 +76,29 @@ def queryPrevious(json_object):
 
         # ตรงนี้ต้องไป รับค่ามา
         card_no = str(json_object["card_no"])
-        date = str(json_object["date"])
-        time = str(json_object["time"])
-
+        date_time = str(json_object["date"]) + " " + str(json_object["time"])
+        amt_1 = json_object["amt_1"]
+        lat = json_object["lat"]
+        lon = json_object["lon"]
         # ----sql script-----
 
         # average amount ไม่แยกตู้ atm ย้อนหลัง ทั้งหมด
-        sql1 = "select avg(amt_1::int) PreviousAvg from generates group by card_no , trans , date , fraud  having  card_no like %s and fraud not like'1'"
+        sql1 = "select avg(amt_1::int) PreviousAvg from generates group by card_no , trans  , fraud  having  card_no like %s and fraud not like '1'"
 
         # average amount ไม่แยกตู้ atm ย้อนหลัง 1 วัน
-        sql2 = "select avg(amt_1::int) PreviousAvg from generates group by card_no , trans  , date  having date::date > %s::date - interval '1 day' and card_no like %s"
+        sql2 = "select avg(amt_1::int) PreviousAvg from generates group by card_no , trans  , date_time  having date_time::date > %s::date - interval '1 day' and card_no like %s"
 
         # average amount ไม่แยกตู้ atm ย้อนหลัง 2 ชม.
-        sql3 = "select avg(amt_1::int) PreviousAvg from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '2 hour' and card_no like %s) a group by date"
+        sql3 = "select avg(amt_1::int) PreviousAvg from (select date_time ,card_no ,trans,amt_1  from generates group by card_no , trans, date_time , amt_1  having date_time::timestamp > %s::timestamp - interval '2 hour' and card_no like %s) a group by date_time "
 
         # average amount ไม่แยกตู้ atm ย้อนหลัง 1 ชม.
-        sql4 = "select avg(amt_1::int) PreviousAvg from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '1 hour' and card_no like %s) a group by date"
+        sql4 = "select avg(amt_1::int) PreviousAvg from (select date_time ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date_time  , amt_1  having date_time::timestamp > %s::timestamp - interval '1 hour' and card_no like %s) a group  by date_time"
 
         # average amount ไม่แยกตู้ atm ย้อนหลัง 5 น.
-        sql5 = "select avg(amt_1::int) PreviousAvg from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '5 minutes' and card_no like %s) a group by date"
+        sql5 = "select avg(amt_1::int) PreviousAvg from (select date_time ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date_time , amt_1  having date_time::timestamp > %s::timestamp - interval '5 minutes' and card_no like %s) a group  by date_time"
 
         # lat lon ของ transaction ก่อนหน้า
-        sql6 = "select lat ,lon from generates WHERE card_no LIKE %s ORDER BY date, time DESC LIMIT 1"
+        sql6 = "select lat ,lon from generates WHERE card_no LIKE %s ORDER BY date_time DESC LIMIT 1"
         # execute a statement
         previous_avg = []
         with conn:
@@ -105,39 +106,44 @@ def queryPrevious(json_object):
                 curs.execute(sql1, (card_no,))
                 display = curs.fetchone()
                 if display is None:
-                    display = [0]
+                    display = [amt_1]
+                # print(1, display)
                 previous_avg.append(previous_avg_to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql2, (date, card_no,))
+                curs.execute(sql2, (date_time, card_no,))
                 display = curs.fetchone()
                 if display is None:
-                    display = [0]
+                    display = [amt_1]
+                # print(2, display)
                 previous_avg.append(previous_avg_to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql3, (time, card_no,))
+                curs.execute(sql3, (date_time, card_no,))
                 display = curs.fetchone()
                 if display is None:
-                    display = [0]
+                    display = [amt_1]
+                # print(3, display)
                 previous_avg.append(previous_avg_to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql4, (time, card_no,))
+                curs.execute(sql4, (date_time, card_no,))
                 display = curs.fetchone()
                 if display is None:
-                    display = [0]
+                    display = [amt_1]
+                # print(4, display)
                 previous_avg.append(previous_avg_to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql5, (time, card_no,))
+                curs.execute(sql5, (date_time, card_no,))
                 display = curs.fetchone()
                 if display is None:
-                    display = [0]
+                    display = [amt_1]
+                # print(5, display)
                 previous_avg.append(previous_avg_to_json(display))
 
         with conn:
@@ -145,7 +151,8 @@ def queryPrevious(json_object):
                 curs.execute(sql6, (card_no,))
                 display = curs.fetchone()
                 if display is None:
-                    display = [0, 0]
+                    display = [lat, lon]
+                # print(6, display)
                 lat_lon = lat_lon_to_json(display)
 
         # display the PostgreSQL database
@@ -155,6 +162,7 @@ def queryPrevious(json_object):
         }
 
     except (Exception, psycopg2.DatabaseError) as error:
+
         print(error)
     finally:
         if conn is not None:
@@ -173,28 +181,25 @@ def queryState(json_object):
 
         # ตรงนี้ต้องไป รับค่ามา
         card_no = str(json_object["card_no"])
-        date = str(json_object["date"])
-        time = str(json_object['time'])
+        date_time = str(json_object["date"]) + " " + str(json_object["time"])
+        amt_1 = json_object["amt_1"]
 
         # ----sql script-----
 
         # freq transaction ทั้งหมด และ sum amount ไม่แยกตู้ atm ย้อนหลัง ทั้งหมด
-        sql1 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from generates group by card_no , trans  , date , fraud  having  card_no like %s and fraud not like '1'"
+        sql1 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from generates group by card_no , trans  , date_time , fraud  having  card_no like %s and fraud not like '1'"
 
         # freq transaction ทั้งหมด และ sum amount ไม่แยกตู้ atm ย้อนหลัง 1 วัน
-        sql2 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from generates group by card_no , trans  , date  having date::date > %s::date - interval '1 day' and card_no like %s"
+        sql2 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from generates group by card_no , trans  , date_time  having date_time::date > %s::date - interval '1 day' and card_no like %s"
 
         # freq transaction ทั้งหมด และ sum amount ไม่แยกตู้ atm ย้อนหลัง 2 ชั่วโมง
-        sql3 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '2 hour' and card_no like %s) a group by date"
+        sql3 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date_time ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date_time , amt_1  having date_time::timestamp > %s::timestamp - interval '2 hour' and card_no like %s) a group  by date_time"
 
         # freq transaction ทั้งหมด และ sum amount ไม่แยกตู้ atm ย้อนหลัง 1 ชั่วโมง
-        sql4 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '1 hour' and card_no like %s) a group by date"
+        sql4 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date_time ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date_time , amt_1  having date_time::timestamp > %s::timestamp - interval '1 hour' and card_no like %s) a group  by date_time"
 
         # freq transaction ทั้งหมด และ sum amount ไม่แยกตู้ atm ย้อนหลัง 5 นาที
-        sql5 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date , time , amt_1  having time::time > %s::time - interval '5 minutes' and card_no like %s) a group by date"
-
-        # std lat lon ใน 1 วัน
-        sql6 = "select lat, lon from generates where date::date > %s::date - interval '1 day' and card_no like %s"
+        sql5 = "select count(trans) freq,sum(amt_1::int) sumary,avg(amt_1::int) average from (select date_time ,card_no ,atm_id ,trans,amt_1  from generates group by card_no , trans , atm_id , date_time , amt_1  having date_time::timestamp > %s::timestamp - interval '5 minutes' and card_no like %s) a group  by date_time"
 
         # execute a statement
         freq_sum_avg = []
@@ -203,34 +208,44 @@ def queryState(json_object):
                 curs.execute(sql1, (card_no,))
                 display = curs.fetchone()
                 # print(1, display)
+                if display is None:
+                    display = [1, amt_1, amt_1]
+
                 freq_sum_avg.append(to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql2, (date, card_no,))
+                curs.execute(sql2, (date_time, card_no,))
                 display = curs.fetchone()
                 # print(2, display)
+                if display is None:
+                    display = [1, amt_1, amt_1]
                 freq_sum_avg.append(to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql3, (time, card_no,))
+                curs.execute(sql3, (date_time, card_no,))
                 display = curs.fetchone()
-                # print(3, display)
+                if display is None:
+                    display = [1, amt_1, amt_1]
                 freq_sum_avg.append(to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql4, (time, card_no,))
+                curs.execute(sql4, (date_time, card_no,))
                 display = curs.fetchone()
                 # print(4, display)
+                if display is None:
+                    display = [1, amt_1, amt_1]
                 freq_sum_avg.append(to_json(display))
 
         with conn:
             with conn.cursor() as curs:
-                curs.execute(sql5, (time, card_no,))
+                curs.execute(sql5, (date_time, card_no,))
                 display = curs.fetchone()
                 # print(5, display)
+                if display is None:
+                    display = [1, amt_1, amt_1]
                 freq_sum_avg.append(to_json(display))
 
         # display the PostgreSQL database
@@ -239,6 +254,7 @@ def queryState(json_object):
         }
 
     except (Exception, psycopg2.DatabaseError) as error:
+        traceback.print_exc()
         print(error)
     finally:
         if conn is not None:
@@ -261,12 +277,11 @@ def insertPreItems(json_object):
         cur = conn.cursor()
 
         postgres_insert_query = """
-        INSERT INTO pre_items (amt_1, card_no, "date", fraud, "time", freq_5_minitues, sumary_5_minitues, average_5_minitues, diff_5_minitues, freq_1_hour, sumary_1_hour, average_1_hour, diff_1_hour, freq_2_hour, sumary_2_hour, average_2_hour, diff_2_hour, freq_daily, sumary_daily, average_daily, diff_daily, freq_total, sumary_total, average_total, diff_total,diff_lat_lon,is_night) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+        INSERT INTO pre_items (amt_1, card_no, date_time, fraud, freq_5_minitues, sumary_5_minitues, average_5_minitues, diff_5_minitues, freq_1_hour, sumary_1_hour, average_1_hour, diff_1_hour, freq_2_hour, sumary_2_hour, average_2_hour, diff_2_hour, freq_daily, sumary_daily, average_daily, diff_daily, freq_total, sumary_total, average_total, diff_total, diff_lat_lon, is_night) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
         json_object = json.loads(json_object)
         record_to_insert = (
-            json_object["amt_1"], str(json_object["card_no"]), json_object["date"], str(json_object["fraud"]),
-            json_object["time"],
+            json_object["amt_1"], str(json_object["card_no"]), json_object["date_time"], str(json_object["fraud"]),
             json_object["freq_5_minitues"], json_object["sumary_5_minitues"], json_object["average_5_minitues"],
             json_object["diff_5_minitues"],
             json_object["freq_1_hour"], json_object["sumary_1_hour"], json_object["average_1_hour"],
@@ -289,6 +304,7 @@ def insertPreItems(json_object):
         # close the communication with the PostgreSQL
         cur.close()
     except (Exception, psycopg2.DatabaseError) as error:
+
         print(error)
     finally:
         if conn is not None:

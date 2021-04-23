@@ -6,9 +6,9 @@ if __name__ == '__main__':
     # Opening JSON file
     f = open('csvjson.json', )
     data = json.load(f)
-    check = 1
+    # check = 1
     for i in data:
         x = requests.post(url, json=i)
-        if check == 5 :
-            break
-        check += 1
+        # if check == 5 :
+        #     break
+        # check += 1
