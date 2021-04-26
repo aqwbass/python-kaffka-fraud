@@ -50,6 +50,7 @@ def preprocress_model(json_obj, previous, now):
     previous_total = json.loads(previous['previous_avg'][0])
     # ระยะห่างจากที่ที่ ทำรายการครั้งล่าสุด หน่วย km
     lat_lon = json.loads(previous["lat_lon"])
+    now_invalid_pin = json.loads(now['freq_invalid_pin'])
 
     return json.dumps(
         {
@@ -79,6 +80,8 @@ def preprocress_model(json_obj, previous, now):
             "diff_total": diff_amt(json_obj["amt_1"], previous_total["previous_avg"]),
             "diff_lat_lon": haversine(lat_lon["lon"], lat_lon["lat"], json_obj["lon"],
                                       json_obj["lat"]),
-            "is_night": in_between(json_obj["time"])
+            "is_night": in_between(json_obj["time"]),
+            "freq_3_day": now_invalid_pin['freq_total'],
+            "freq_invalid_pin": now_invalid_pin['freq_invalid_pin']
         }
     )

@@ -17,7 +17,13 @@ def lat_lon_to_json(obj):
             "lon": float(obj[1])
         }
     )
-
+def invalid_pin_to_json(obj1, obj2):
+    return json.dumps(
+        {
+            "freq_total": obj1[0],
+            "freq_invalid_pin": obj2[0]
+        }
+    )
 
 def to_json(obj):
     return json.dumps(

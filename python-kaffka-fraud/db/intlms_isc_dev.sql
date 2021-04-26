@@ -46,7 +46,9 @@ CREATE TABLE IF NOT EXISTS public.pre_items (
     average_total numeric,
     diff_total integer,
     diff_lat_lon numeric,
-    is_night text
+    is_night text,
+    freq_3_day integer,
+    freq_invalid_pin integer
 );
 
 
